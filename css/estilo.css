@@ -241,3 +241,16 @@ td{padding:12px;border-top:1px solid var(--line-2)}
 .nav-user .link{color:var(--nav-strong);padding:4px 0;min-height:32px;font-size:14px}
 .cfg-form{border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:14px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+
+/* v2: configurações e autorizações */
+.chk{width:22px;height:22px;accent-color:var(--accent);cursor:pointer}
+.inp.num-in{width:84px;min-height:40px;padding:6px 10px;text-align:right}
+.row-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row-add .inp{flex:1 1 200px;width:auto}
+.chips.scroll-x{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip[disabled]{opacity:.4;cursor:not-allowed}
+table.hor input[type=time]{min-height:40px;border:2px solid var(--line);border-radius:10px;padding:4px 8px;background:var(--surface);color:var(--fg);font-size:16px}
+table.hor input[type=time]:disabled{opacity:.4}
+select.inp{cursor:pointer}
+.paper{white-space:pre-line}
+@media (max-width:900px){.chips.cfg-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.chips.cfg-tabs .chip{flex:none}}

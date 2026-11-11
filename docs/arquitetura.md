@@ -1,8 +1,9 @@
 # Arquitetura — sis_Clinicas
 
-> Versão 0.2 — 04/11/2026 — sistema web, JavaScript, custo mínimo
+> Versão 0.3 — 10/11/2026 — sistema web, JavaScript, custo mínimo
 >
-> Substitui a v0.1 (app desktop com servidor local). Motivo: os primeiros clientes não querem manter servidor dentro da clínica.
+> v0.2 substituiu a v0.1 (app desktop com servidor local), porque os primeiros clientes não querem manter servidor dentro da clínica.
+> v0.3 incorpora o levantamento de requisitos (`mvp.md` v0.3): **assinador local para token A3** (§3.6), **WhatsApp em três formas**, incluindo API não oficial opcional (§3.7), e **importação de dados** (§3.8).
 
 ## 1. Decisões
 
@@ -18,38 +19,46 @@
 | A8 | Hospedagem no **Oracle Cloud Always Free, região São Paulo**, com **Docker Compose** | Gratuito, com folga para várias clínicas; dados no Brasil; Docker permite mudar de provedor em uma hora (§4) |
 | A9 | **Cloudflare (plano gratuito)** na frente: DNS, HTTPS, proteção contra ataques | Gratuito |
 | A10 | Backup criptografado num **provedor diferente** do servidor (Backblaze B2) | Se a conta da Oracle tiver problema, os dados estão em outro lugar |
-| A11 | **WhatsApp oficial (Cloud API da Meta)**; começar com links `wa.me` gratuitos | APIs não oficiais violam os termos do WhatsApp e podem bloquear o número da clínica |
-| A12 | Pode ser **instalado como app** no PC (PWA): ícone na área de trabalho, janela própria, notificações | Mesma experiência de "programa instalado" sem instalador, sem custo |
+| A11 | **WhatsApp em três formas, escolhidas pela clínica**: `wa.me` gratuito (início), **Cloud API oficial** (objetivo) e **API não oficial** (opcional, desligada por padrão). Cada forma é um módulo com a mesma interface | O perfil dos clientes pede a opção não oficial; isolar em módulos permite trocar sem afetar o resto e desligar se der problema (§3.7) |
+| A12 | Pode ser **instalado como app** no PC e no celular (PWA): ícone, janela própria, notificações. Todas as telas com layout para celular | Mesma experiência de "programa instalado" sem instalador, sem custo |
+| A13 | **Assinador local** para token A3, instalado só nos PCs dos médicos que usam token. Conexão **de saída** com o servidor, sem porta aberta no PC | O navegador não acessa o token sozinho; a conexão de saída evita os bloqueios dos navegadores a `localhost` (§3.6) |
+| A14 | **Importação de dados** processada em fila no servidor, com prévia e opção de desfazer | Clínicas vindas de planilhas ou de outros sistemas (§3.8) |
 
-**Muda em relação ao `mvp.md`:** a D6 volta a ser **web primeiro** (sem app desktop), e a D7 volta a ser **online obrigatório**, com contingência (§6).
+**Em relação ao `mvp.md`:** D6 é **web**, com a única instalação sendo o assinador A3; D7 é **online obrigatório**, com contingência (§6).
 
 ## 2. Visão geral
 
 ```mermaid
 flowchart TB
-  subgraph Clinica["Clínica (só navegador)"]
+  subgraph Clinica["Clínica (navegador)"]
     R["PC Recepção"]
     C["PCs Consultórios"]
+    A3["Assinador local<br/>(só PCs com token A3)"]
     M["Celular do médico"]
     TV["TV da sala de espera"]
   end
   R & C & M & TV -->|HTTPS + WebSocket| CF["Cloudflare<br/>DNS · HTTPS · proteção<br/>(gratuito)"]
+  A3 -->|WebSocket de saída| CF
   subgraph OCI["Oracle Cloud Always Free — São Paulo"]
     CADDY["Caddy<br/>arquivos do front + proxy"]
     API["api<br/>Node.js + Fastify<br/>API · tempo real · tarefas"]
+    WAN["mensageria<br/>wa.me · Cloud API · não oficial"]
     DB[("PostgreSQL")]
     CADDY --> API --- DB
+    API --- WAN
   end
   CF --> CADDY
   API -->|arquivos| R2["Cloudflare R2<br/>exames e PDFs"]
-  API --> EXT["WhatsApp Cloud API · Memed ·<br/>certificado em nuvem · BrasilAPI · e-mail"]
-  EXT -->|webhook| CF
+  API --> EXT["Memed · certificado em nuvem ·<br/>BrasilAPI · e-mail"]
+  WAN --> WA["WhatsApp<br/>(Cloud API ou sessão não oficial)"]
+  WA -->|webhook| CF
   OCI -->|backup cifrado diário| B2["Backblaze B2"]
 ```
 
 - A clínica abre `app.sisclinicas.com.br` no navegador (ou no ícone instalado). Não há servidor na clínica.
 - Um único servidor atende todas as clínicas. Cada registro tem `clinica_id`, e o banco impede que uma clínica veja dados de outra (RLS).
-- O WhatsApp chega direto no servidor, que já é público. Não precisa mais de túnel.
+- O WhatsApp chega direto no servidor, que já é público. Não precisa de túnel.
+- O único programa instalado na clínica é o assinador A3, e só nos PCs de quem assina com token.
 
 ## 3. Componentes
 
@@ -78,7 +87,9 @@ flowchart TB
 | Tempo real | Socket.IO. Com mais de uma instância, o adaptador oficial para PostgreSQL, ainda sem Redis |
 | Tarefas e filas | pg-boss: lembretes, envio de WhatsApp com novas tentativas, expiração de sessões, relatórios agendados |
 | PDF | pdfmake (gera no servidor, sem navegador embutido) |
-| Assinatura de PDF | `@signpdf` para PAdES com **certificado em nuvem** (§5) |
+| Assinatura de PDF | `@signpdf` para PAdES, com **certificado em nuvem** (§5) ou **token A3** pelo assinador local (§3.6) |
+| Mensageria | um módulo por forma de WhatsApp (`wa.me`, Cloud API, não oficial), todos com a mesma interface: `enviar`, `receber`, `status` (§3.7) |
+| Importação | `exceljs` e um leitor de CSV (§3.8) |
 | Logs | pino (já vem no Fastify), sem dados pessoais |
 
 ### 3.3 Banco de dados: PostgreSQL, não MongoDB
@@ -105,6 +116,51 @@ Exames, imagens e PDFs assinados ficam no **Cloudflare R2** (compatível com S3,
 
 Página `/painel/<código>` aberta em qualquer TV com navegador, Chromecast ou PC velho ligado na TV. Usa um código por sala, sem login de usuário, e só mostra o primeiro nome e a sala.
 
+### 3.6 Assinador local para token A3 (`apps/assinador`)
+
+O navegador não acessa o token A3 sozinho. O assinador é um programa pequeno, instalado **só nos PCs dos médicos que usam token**.
+
+| Item | Escolha |
+|---|---|
+| Linguagem | JavaScript (Node.js), empacotado como executável único (Node SEA) para Windows; mesma linguagem do resto do sistema |
+| Acesso ao token | PKCS#11 com `pkcs11js` (licença MIT), usando o driver do fabricante já instalado no PC (SafeNet, Watchdata, GD etc.) |
+| Comunicação | **conexão de saída** (WebSocket seguro) do assinador para o servidor. Não abre porta no PC e não depende de `localhost`, que os navegadores restringem cada vez mais |
+| Pareamento | na primeira vez, o médico entra no sistema pelo navegador, que mostra um código; o assinador recebe o código e fica ligado àquele usuário. Pode ser desligado pelo Admin |
+| Fluxo | o médico clica em assinar → o servidor gera o resumo (hash) do PDF → envia ao assinador do médico → o assinador pede o PIN do token, assina e devolve → o servidor monta o PDF assinado (PAdES) e confere |
+| Instalação | instalador `.exe` gerado no GitHub Actions; inicia com o Windows, fica na bandeja; atualização automática |
+| Segurança | a chave privada nunca sai do token; o PIN é digitado no assinador e não vai para o servidor; o assinador só aceita pedidos do usuário pareado e mostra o nome do paciente e o tipo do documento antes de assinar |
+
+**Alternativa:** licenciar um componente pronto (ex.: Web PKI, da Lacuna), que já resolve os drivers e o navegador, mas tem custo de licença. A decisão fica nos pontos em aberto (§14).
+
+**Custo escondido:** sem um certificado de assinatura de código, o Windows mostra um aviso ao instalar o assinador. Dá para começar assim com a clínica piloto; para distribuir a outras clínicas, o certificado passa a valer a pena (§11).
+
+### 3.7 WhatsApp: três formas de conexão
+
+Cada clínica escolhe a forma em Configurações. O resto do sistema (agenda, lembretes, inbox) fala só com a interface comum `mensageria`, sem saber qual forma está ligada.
+
+| Forma | Como funciona no servidor | Custo | Recursos |
+|---|---|---|---|
+| **`wa.me`** | nenhum: o navegador da recepção abre o WhatsApp com o texto pronto | R$ 0 | só envio manual; sem inbox |
+| **Cloud API (oficial)** | chamadas HTTP para a Meta; mensagens recebidas por webhook | por mensagem de modelo (lembretes); resposta em até 24 h gratuita | envio automático, inbox, botões, status de entrega |
+| **Não oficial** | biblioteca que imita o WhatsApp Web, mantendo **uma sessão aberta por clínica** no servidor. Preferir as que falam o protocolo direto (ex.: Baileys), sem navegador embutido, por usarem muito menos memória que as baseadas em Chromium | R$ 0 | envio automático e inbox; sem botões oficiais |
+
+**Cuidados com a forma não oficial:**
+- Viola os termos do WhatsApp; o número da clínica pode ser **bloqueado**. Fica **desligada por padrão**. Para ligar, o Admin aceita um termo de ciência, registrado com data e usuário.
+- Roda num **processo separado** da API (`mensageria-nao-oficial` no Docker Compose). Se travar ou for bloqueada, a agenda, o prontuário e o caixa não são afetados.
+- Os dados de sessão (chaves do WhatsApp da clínica) ficam criptografados no banco.
+- Reconexão automática e aviso para a clínica quando a sessão cair, com novo QR Code.
+- Volume de envio limitado, com intervalos entre mensagens, para reduzir o risco de bloqueio.
+- Precisa de parecer jurídico e de constar no termo de tratamento de dados (LGPD), porque dados de saúde passam por uma biblioteca sem garantia do WhatsApp.
+- As bibliotecas quebram quando o WhatsApp muda. Fixar versões e ter um plano de volta para `wa.me`.
+
+### 3.8 Importação de dados
+
+- O Admin baixa o modelo de planilha, preenche e envia. O arquivo vai para o R2, e a tarefa `importacao.processar` (pg-boss) lê, valida e monta a prévia, sem gravar nada ainda.
+- A tela mostra a prévia: quantos registros serão criados ou atualizados, os duplicados (mesmo CPF ou celular) e os erros linha a linha.
+- Ao confirmar, a gravação acontece **em uma transação por lote**, com `importacao_item` guardando cada registro criado, o que permite **desfazer** a importação enquanto nada foi alterado depois.
+- Prontuários antigos (PDF ou imagens) entram como anexos na ficha do paciente.
+- Limite inicial: 20 mil linhas por arquivo, para caber com folga na VM gratuita.
+
 ## 4. Hospedagem
 
 ### 4.1 Recomendação: Oracle Cloud Always Free
@@ -128,6 +184,7 @@ VM (Ubuntu Server LTS)
 └─ docker compose
    ├─ caddy      # HTTPS, arquivos do front (build do Vite), proxy para a api
    ├─ api        # Node.js + Fastify + Socket.IO + pg-boss
+   ├─ mensageria-nao-oficial   # só sobe se alguma clínica ligar a API não oficial (§3.7)
    ├─ postgres   # PostgreSQL 17, volume no disco da VM
    └─ backup     # restic + pg_dump, agendado
 ```
@@ -155,10 +212,12 @@ VM (Ubuntu Server LTS)
 
 | Integração | Para quê | Custo | Alternativa gratuita / observação |
 |---|---|---|---|
-| **WhatsApp Cloud API (Meta)** | lembretes, confirmações, inbox | responder o paciente dentro de 24 h da mensagem dele é gratuito; mensagens de modelo (lembretes) são cobradas por mensagem, em centavos (confirmar a tabela atual da Meta para o Brasil) | **Fase 0:** o sistema monta o texto e abre o link `wa.me` no WhatsApp da recepção; ela só toca em enviar. Gratuito e dentro das regras, mas sem inbox integrada nem confirmação automática |
-| WhatsApp não oficial (Baileys, whatsapp-web.js) | — | gratuito | **Não usar:** viola os termos do WhatsApp, pode bloquear o número da clínica e é arriscado para dados de saúde |
-| **Certificado em nuvem do médico** (BirdID, VIDaaS e outros) | assinar consultas, receitas e atestados | o certificado é do médico; o uso da API pelo integrador costuma ser gratuito (confirmar com cada provedor) | **Token A3 fica fora do MVP:** o navegador não acessa o token sozinho; exigiria um pequeno programa local, ou um componente pago como o Web PKI. Fase posterior, se algum médico só tiver A3 |
-| **Memed** | prescrição com base de remédios | gratuita para o médico; a integração exige cadastro como parceiro | receita simples por modelo do próprio sistema (já no MVP) |
+| **WhatsApp `wa.me`** | lembretes e mensagens enviados à mão pela recepção | gratuito | forma inicial: sem inbox nem confirmação automática |
+| **WhatsApp Cloud API (Meta)** | lembretes, confirmações, inbox | responder o paciente dentro de 24 h da mensagem dele é gratuito; mensagens de modelo (lembretes) são cobradas por mensagem, em centavos (confirmar a tabela atual da Meta para o Brasil) | objetivo principal. Exige verificação da empresa na Meta. A verificar: usar o número que já está no WhatsApp Business do celular |
+| WhatsApp não oficial (ex.: Baileys) | inbox e lembretes automáticos sem custo por mensagem | gratuito | **opcional, desligada por padrão**: viola os termos do WhatsApp e pode bloquear o número. Ver os cuidados em §3.7 |
+| **Certificado em nuvem do médico** (BirdID, VIDaaS e outros) | assinar consultas, receitas e atestados | o certificado é do médico; o uso da API pelo integrador costuma ser gratuito (confirmar com cada provedor) | — |
+| **Token A3 do médico** | assinar no PC do consultório | o token é do médico; o assinador local é nosso (§3.6) | componente pronto (ex.: Web PKI), com licença paga |
+| **Memed** *(em estudo)* | prescrição com base de remédios | gratuita para o médico; a integração exige cadastro como parceiro | receita simples por modelo do próprio sistema (já no MVP) |
 | **BrasilAPI / ViaCEP** | CEP, CNPJ, feriados nacionais | gratuitas | — |
 | **CID-10** | busca de diagnóstico | tabela pública do DATASUS, importada no banco | — |
 | **PIX** | QR Code no pagamento | **QR Code estático com valor (padrão BR Code) gerado pelo próprio sistema: gratuito**, conferência manual no extrato | QR dinâmico com baixa automática exige a API de um banco ou intermediador, que costuma cobrar por transação. Fase posterior |
@@ -167,7 +226,7 @@ VM (Ubuntu Server LTS)
 | **Backblaze B2** | backup | 10 GB grátis | — |
 | **UptimeRobot** | avisar se o sistema cair | plano grátis (checagem a cada 5 min) | — |
 | **Sentry** | erros do front e da API | plano grátis para desenvolvedor | configurar para **não enviar dados pessoais** |
-| NFS-e | nota fiscal | o webservice da prefeitura costuma ser gratuito, com certificado A1 da clínica | fase posterior |
+| NFS-e *(em estudo)* | nota fiscal | o webservice da prefeitura costuma ser gratuito, com certificado A1 da clínica; o padrão nacional da NFS-e simplifica a integração | candidata a logo depois do MVP |
 
 ## 6. Sem internet na clínica
 
@@ -175,7 +234,7 @@ Agora o sistema depende da internet da clínica.
 
 | Medida | Custo |
 |---|---|
-| **Segunda conexão:** roteador 4G barato ou um celular roteando, ligado só quando a principal cai | chip pré-pago |
+| **Segunda conexão (opcional):** roteador 4G barato ou um celular roteando, ligado só quando a principal cai. Fica como recomendação no guia de implantação, para a clínica que quiser | chip pré-pago |
 | **Agenda do dia em cache (PWA):** se a conexão cair, a recepção ainda vê quem vem hoje, em modo somente leitura, com aviso de "sem conexão". O cache é apagado ao sair do sistema | R$ 0 |
 | **Imprimir a agenda do dia** (botão na agenda), para quem preferir papel | R$ 0 |
 | Atendimento sem conexão: anotar no papel e lançar depois. Agendar e cobrar offline exigiria sincronização com conflitos, o que não vale a complexidade no MVP | — |
@@ -205,13 +264,16 @@ Meta: perder no máximo **minutos** de dados, e voltar ao ar em **até 2 horas**
 - Prontuário assinado bloqueado por trigger; correções só por adendo.
 - Logs e Sentry sem dados pessoais.
 - Acesso administrativo à VM só por SSH com chave e, no futuro, pelo Cloudflare Access (gratuito até 50 usuários).
+- **Permissões configuráveis** (aba Autorizações): conferidas sempre na API, a partir do perfil e das exceções do usuário; cada mudança vai para a auditoria.
+- **Assinador A3**: chave privada nunca sai do token; PIN digitado só no PC; pareamento por usuário, revogável (§3.6).
+- **WhatsApp não oficial**: sessão criptografada no banco, processo isolado, termo de risco aceito pela clínica (§3.7).
 
 ## 9. Entrega contínua
 
 - **GitHub** (repositório privado, gratuito) + **GitHub Actions** (2.000 minutos/mês grátis para repositório privado): lint, testes com PostgreSQL real e build a cada mudança.
 - Deploy: ao criar uma versão (tag), o Actions gera a imagem Docker, envia ao GitHub Container Registry e, por SSH, roda na VM: **backup → migrações → `docker compose up -d`**.
 - O front é versionado junto. Ao publicar, quem está com o sistema aberto vê "Nova versão disponível, clique para atualizar".
-- Sem instalador nem assinatura de código: o custo de distribuição desaparece.
+- O sistema em si não tem instalador. A exceção é o **assinador A3**: o Actions gera o `.exe` num runner Windows a cada versão, e o assinador se atualiza sozinho.
 
 ## 10. Desenvolvimento (tudo gratuito)
 
@@ -242,11 +304,14 @@ sis_Clinicas/
 ├─ apps/
 │  ├─ web/            # React + Vite (JSX), PWA
 │  │  └─ src/telas/   # inicio, agenda, recepcao, consulta, whatsapp, pagamentos,
-│  │                  # pacientes, recados, relatorios, administracao, painel-tv
-│  └─ api/            # Fastify
-│     └─ src/modulos/ # auth, clinica, pacientes, profissionais, agenda, recepcao,
-│                     # prontuario, assinatura, financeiro, chat, inbox, mensageria,
-│                     # relatorios, auditoria
+│  │                  # pacientes, recados, relatorios, configuracoes, importacao, painel-tv
+│  ├─ api/            # Fastify
+│  │  └─ src/modulos/ # auth, autorizacoes, clinica, pacientes, profissionais, agenda,
+│  │                  # recepcao, prontuario, assinatura, financeiro, chat, inbox,
+│  │                  # mensageria/{wame,cloud-api,nao-oficial}, pesquisas, importacao,
+│  │                  # relatorios, auditoria
+│  ├─ mensageria-nao-oficial/  # processo separado da sessão não oficial (§3.7)
+│  └─ assinador/      # assinador local para token A3, Windows (§3.6)
 ├─ packages/
 │  └─ shared/         # esquemas Zod, status, regras puras (dinheiro em centavos, horários)
 ├─ db/
@@ -268,10 +333,13 @@ sis_Clinicas/
 | Cloudflare, R2 até 10 GB, B2 até 10 GB, Brevo, UptimeRobot, Sentry, GitHub | por mês | **R$ 0** nos planos gratuitos |
 | Domínio do produto (ex.: `sisclinicas.com.br`) | por ano | ≈ R$ 40 |
 | WhatsApp: lembretes automáticos (Cloud API) | por mês | por mensagem de modelo enviada; responder o paciente em até 24 h é gratuito. **Fase 0 com `wa.me`: R$ 0** |
-| Certificado digital | — | do médico |
+| WhatsApp não oficial | por mês | **R$ 0** (usa memória da mesma VM) |
+| Certificado digital | — | do médico (nuvem ou token A3) |
+| Certificado de assinatura de código (para o instalador do assinador A3 não gerar aviso no Windows) | por ano | opcional na clínica piloto; recomendado ao distribuir para outras clínicas (pesquisar preço) |
+| Componente pronto para A3 (ex.: Web PKI) | por ano | só se decidirmos não desenvolver o assinador próprio (§14) |
 | Na clínica | uma vez | **R$ 0** (usa os PCs e a internet que já existem); roteador 4G de reserva opcional |
 
-Comparado à v0.1, sai o mini PC e o nobreak da clínica e o certificado de assinatura do instalador.
+Comparado à v0.1, sai o mini PC e o nobreak da clínica. Comparado à v0.2, volta a possibilidade de pagar um certificado de assinatura de código, por causa do assinador A3.
 
 ## 12. Evolução
 
@@ -281,7 +349,8 @@ Comparado à v0.1, sai o mini PC e o nobreak da clínica e o certificado de assi
 | 2 a ~20 clínicas | mesma VM; cada clínica é um registro novo (já multi-clínica) | R$ 0 enquanto couber na VM gratuita (acompanhar uso de CPU, RAM e disco) |
 | Crescimento | banco gerenciado ou VM paga maior; API em mais de uma instância (Socket.IO com adaptador PostgreSQL) | conforme o número de clínicas, coberto pela mensalidade |
 | App de celular | a própria PWA instalada no celular; app nativo só se houver necessidade real | R$ 0 |
-| Token A3 | pequeno programa local para assinar com o token | fase posterior |
+| Muitas clínicas na API não oficial | mover `mensageria-nao-oficial` para uma VM própria | conforme o número de sessões |
+| NFS-e | integração com o padrão nacional da NFS-e | em estudo |
 
 ## 13. Riscos
 
@@ -292,13 +361,18 @@ Comparado à v0.1, sai o mini PC e o nobreak da clínica e o certificado de assi
 | Invasão (o sistema agora está na internet) | duas etapas obrigatória, limite de tentativas, Cloudflare na frente, firewall só para a Cloudflare, atualizações automáticas, RLS e auditoria |
 | Erro de tipo por usar JS puro | Zod, testes nas regras críticas, constraints no banco (§10.1) |
 | Custo do WhatsApp crescer | começar com `wa.me`; usar a API só para lembretes que reduzem faltas e mostrar o custo nos relatórios |
+| **Número da clínica bloqueado** pela API não oficial | desligada por padrão, termo de risco, limite de volume, processo isolado, volta rápida para `wa.me` ou API oficial |
+| Biblioteca não oficial parar de funcionar após mudança do WhatsApp | versões fixadas, monitoramento da sessão, plano de volta para outra forma de envio |
+| Assinador A3 não reconhecer algum token | testar com os tokens reais dos médicos antes da implantação; lista de drivers suportados; alternativa de componente pronto |
 | Mudança de preço ou regra das APIs gratuitas | cada integração isolada num módulo próprio, fácil de trocar |
 | Atualização quebrar o banco | backup automático antes de todo deploy e migrações testadas no GitHub Actions |
 
 ## 14. Pontos em aberto
 
+Resolvidos no levantamento (10/11/2026): WhatsApp começa por `wa.me`, com Cloud API e API não oficial como opções (§3.7); os médicos podem ter certificado em nuvem e token A3, então o A3 entra no MVP (§3.6); a internet é estável, com 4G opcional (§6).
+
 1. Nome e domínio do produto (ex.: `sisclinicas.com.br`)?
 2. Criar a conta na Oracle Cloud (São Paulo) agora ou começar só com o ambiente local?
-3. Começar o WhatsApp pela Fase 0 (`wa.me`, gratuita) ou já contratar a Cloud API?
-4. Algum médico só tem **token A3** (sem certificado em nuvem)? Isso define se o A3 entra antes.
-5. A internet da clínica é estável? Vale indicar o 4G de reserva desde o início?
+3. Assinador A3: desenvolver o próprio (§3.6) ou licenciar um componente pronto?
+4. API não oficial: parecer jurídico e texto do termo de ciência de risco antes de liberar para clientes.
+5. Número de WhatsApp: confirmar se o número do WhatsApp Business pode ser usado na Cloud API sem perder o app no celular.

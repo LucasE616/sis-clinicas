@@ -50,7 +50,17 @@ Perfis: **Recepção**, **Médico(a)** e **Gestão**, com permissões editáveis
 - WhatsApp Cloud API e API não oficial (caixa de entrada integrada)
 - Itens em estudo: encaixe e lista de espera, Memed, NFS-e, lista final de relatórios
 
-Detalhes em [docs/mvp.md](docs/mvp.md) e [docs/arquitetura.md](docs/arquitetura.md).
+## Documentação
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/mvp.md](docs/mvp.md) | escopo, decisões, permissões, modelo de dados, API e telas |
+| [docs/arquitetura.md](docs/arquitetura.md) | stack, hospedagem, integrações, custos e riscos |
+| [docs/pwa.md](docs/pwa.md) | o sistema como PWA: instalação, uso sem internet, notificações |
+| [docs/plano-de-acao.md](docs/plano-de-acao.md) | fases, marcos, cronograma das sprints e implantação |
+| [docs/primeiros-passos.md](docs/primeiros-passos.md) | checklist do levantamento de requisitos |
+
+Índice completo em [docs/README.md](docs/README.md).
 
 ## Estrutura
 

@@ -1,7 +1,7 @@
 # Primeiros passos — sis_Clinicas
 
 > 04/11/2026. Do esboço publicado até o início do desenvolvimento do MVP.
-> Referências: [mvp.md](mvp.md) e [arquitetura.md](arquitetura.md).
+> Referências: [mvp.md](mvp.md), [arquitetura.md](arquitetura.md), [pwa.md](pwa.md) e [plano-de-acao.md](plano-de-acao.md) (cronograma e ações imediatas).
 
 ## Já feito
 

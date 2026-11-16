@@ -73,7 +73,7 @@ flowchart TB
 | Agenda | **componente próprio**, igual à grade dos simuladores. Evita os plugins pagos do FullCalendar (a visão por profissional é paga) |
 | Tempo real | Socket.IO client: agenda, chegada de paciente, inbox, painel da TV |
 | Impressão | página de impressão com CSS próprio (recibo, receita, atestado) e `window.print()` |
-| PWA | `vite-plugin-pwa`: instalar como app, notificações, agenda do dia em cache para contingência (§6) |
+| PWA | `vite-plugin-pwa`: instalar como app, notificações, agenda do dia em cache para contingência (§6). Especificação completa em `pwa.md` |
 
 ### 3.2 Back (`apps/api`)
 

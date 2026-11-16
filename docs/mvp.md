@@ -685,11 +685,11 @@ sis_Clinicas/
 
 ## 11. Plano de entrega
 
-Estimativa para **2 devs full-stack**, sprints de 2 semanas.
+Estimativa para **2 devs full-stack**, sprints de 2 semanas. Datas, responsáveis, ações imediatas e implantação estão em `plano-de-acao.md`; os detalhes do PWA, em `pwa.md`.
 
 | Sprint | Entrega |
 |---|---|
-| S1 | Monorepo, CI, Docker; VM na Oracle com deploy automático (validar cedo); auth + 2FA; usuários, perfis e **aba Autorizações**; clínica, unidades, salas, especialidades; auditoria base |
+| S1 | Monorepo, CI, Docker; VM na Oracle com deploy automático (validar cedo); auth + 2FA; usuários, perfis e **aba Autorizações**; clínica, unidades, salas, especialidades; auditoria base; **base do PWA** (manifest, service worker, instalar, aviso de nova versão) |
 | S2 | Pacientes (CRUD, busca, duplicidade, consentimentos); profissionais, procedimentos e exames com duração livre, **aba Horários** (clínica e profissional), bloqueios |
 | S3 | Agenda: visões dia/semana/lista, agendar/remarcar/cancelar, constraint de sobreposição, tempo real, horários livres, **política de desmarcação e faltas** |
 | S4 | Máquina de estados, recepção/check-in, painel de chamada, lista de espera (conforme o estudo) |
@@ -700,7 +700,7 @@ Estimativa para **2 devs full-stack**, sprints de 2 semanas.
 | S9 | Prontuário II: assinatura com certificado em nuvem, PDF/A, adendos, imutabilidade, documentos clínicos; Memed se aprovada |
 | S10 | **Assinador local A3** (instalador, PKCS#11, atualização) e testes com tokens reais; API não oficial do WhatsApp (opcional, com termo de risco) |
 | S11 | **Importação de dados externos**; pesquisa de satisfação; relatórios (lista final escolhida) |
-| S12 | Layout para celular revisado tela a tela; PWA: instalação, notificações, agenda do dia em cache, páginas de impressão |
+| S12 | Layout para celular revisado tela a tela; testes do PWA na matriz de navegadores (a agenda sem internet entra na S3 e as notificações nas S6 e S7, ver `plano-de-acao.md`) |
 | S13 | Hardening, pentest, E2E, teste de restauração do backup, termo LGPD com a clínica |
 | S14 | Homologação com a equipe da clínica, treinamento, implantação assistida |
 

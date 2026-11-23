@@ -28,6 +28,11 @@ Esses itens têm prazo de aprovação de terceiros. Começar agora evita travar 
   - [ ] Brevo (e-mail)
   - [ ] UptimeRobot e Sentry
 - [ ] **Cofre de senhas** para guardar as credenciais do projeto (ex.: Bitwarden, plano gratuito)
+- [ ] **Google AI Studio** — criar o projeto e a chave da API gratuita (Gemini) com a conta do produto
+  > **Decisão (23/11/2026):** a IA usa, no início, a API gratuita do Google AI Studio.
+  > ⚠ No plano gratuito, nenhum dado pessoal ou de saúde de paciente (o Google pode usar o conteúdo enviado e revisores podem lê-lo). Tarefas completas em `plano-de-acao.md` §3.3.
+  - [ ] Definir os casos de uso da IA e quais envolvem dados de pacientes (até 04/12)
+  - [ ] Confirmar os termos e os limites atuais do plano gratuito
 
 ## 2. Levantamento de requisitos (com você)
 

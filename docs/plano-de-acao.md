@@ -45,6 +45,38 @@ As datas consideram início em 23/11/2026, pausa de fim de ano de 21/12/2026 a 0
 | 8 | Transformar o **esboço em PWA instalável** (manifest, ícones, service worker simples) | Dev | 27/11 |
 | 9 | Proteger a branch `main` do GitHub (mudanças por pull request) e ligar os checks automáticos | Dev | 20/11 |
 | 10 | Mover o esboço para `prototipo/` e preparar o monorepo (`apps/web`, `apps/api`, `packages/shared`, `db`, `infra`) | Dev | 27/11 |
+| 11 | Criar o projeto e a chave da API no **Google AI Studio** (Gemini), com a conta do produto; guardar a chave no cofre de senhas | Produto | 27/11 |
+| 12 | Definir os casos de uso da IA (ver §3.3) | Produto | 04/12 |
+
+### 3.3 Inteligência artificial — Google AI Studio (decisão de 23/11/2026)
+
+No início, a IA usa a **API gratuita do Google AI Studio** (modelos Gemini).
+
+⚠ **Regra de privacidade do plano gratuito:** pelos termos do Google, o conteúdo enviado no plano gratuito pode ser usado para melhorar os produtos do Google e pode ser lido por revisores humanos. Por isso, **nenhum dado pessoal ou de saúde de paciente vai para o plano gratuito** (LGPD). No plano gratuito, só entram dados fictícios, textos genéricos e números agregados sem identificar ninguém. Confirmar os termos e os limites atuais antes de começar.
+
+| # | Tarefa | Responsável | Quando |
+|---|---|---|---|
+| IA1 | Criar o projeto e a chave no AI Studio (ação 11) | Produto | Fase 0 |
+| IA2 | Escolher os casos de uso e classificar cada um: **sem dados pessoais** (pode usar o plano gratuito) ou **com dados de pacientes** (exige plano pago, termo de tratamento de dados e parecer jurídico) | Produto | 04/12 |
+| IA3 | Módulo `ia` na API, com uma interface única (`gerar`, `resumir`, `classificar`) para trocar de modelo ou de provedor sem mexer no resto do sistema, como no WhatsApp | Dev | S6 |
+| IA4 | A chave fica **só no servidor** (variável de ambiente), nunca no navegador, no esboço ou no GitHub | Dev | S6 |
+| IA5 | Filtro de segurança antes do envio: bloquear CPF, telefone, e-mail e nomes de pacientes nos textos que vão para o plano gratuito | Dev | S6 |
+| IA6 | Respeitar os limites do plano gratuito (requisições por minuto e por dia): fila, novas tentativas e aviso amigável "IA indisponível agora, tente em instantes" | Dev | S6 |
+| IA7 | A IA **só sugere**: a pessoa revisa e confirma. Nada é enviado ao paciente, gravado no prontuário ou assinado sem confirmação humana | Dev | sempre |
+| IA8 | Registrar o uso (quem, quando, qual função), sem guardar o conteúdo enviado | Dev | S6 |
+| IA9 | Primeira função com IA em homologação, com um caso de uso **sem dados pessoais** | Dev | S7 |
+| IA10 | Antes de usar com dados de pacientes: passar para o plano pago, incluir o Google como suboperador no termo LGPD e obter o parecer jurídico | Produto | antes de liberar |
+
+**Casos de uso candidatos** (para a decisão IA2):
+
+| Caso de uso | Dados envolvidos | Plano gratuito? |
+|---|---|---|
+| Sugerir textos de mensagens automáticas e respostas rápidas | nenhum dado de paciente | **sim** |
+| Sugerir seções de modelos de prontuário por especialidade | nenhum dado de paciente | **sim** |
+| Explicar os números dos relatórios para a gestão | só números agregados | **sim** |
+| Sugerir resposta para dúvida de paciente no WhatsApp | mensagem do paciente | não: exige plano pago |
+| Resumir o histórico do paciente para o médico | dados de saúde | não: exige plano pago |
+| Organizar o texto da consulta (ditado ou anotações) nas seções do modelo | dados de saúde | não: exige plano pago |
 
 ### 3.2 Decisões que precisam sair antes de cada sprint
 
@@ -58,6 +90,7 @@ As datas consideram início em 23/11/2026, pausa de fim de ano de 21/12/2026 a 0
 | Assinador A3: próprio ou componente pronto | S10 | 26/03/2027 |
 | Lista final de relatórios | S11 | 23/04/2027 |
 | NFS-e (hoje fora do MVP) | depois do MVP | — |
+| Casos de uso da IA e quais usam dados de pacientes (§3.3) | S6 e S7 | 04/12/2026 |
 
 ## 4. Fase 1 — Construção (14 sprints)
 
@@ -71,8 +104,8 @@ Cada sprint termina com uma **demonstração** para a clínica piloto no ambient
 | **S3** | 04/01 – 15/01 | Agenda: dia, semana e lista; marcar, mudar e desmarcar; sem horário duplicado (garantido pelo banco); tempo real; política de desmarcação e faltas | **agenda do dia sem internet** (somente leitura) |
 | **S4** | 18/01 – 29/01 | Estados do atendimento, chegada, sala de espera, painel da TV, lista de espera (conforme o estudo) | TV em tela cheia e sempre acesa |
 | **S5** | 01/02 – 12/02 | Financeiro: formas de pagamento, vários caixas, contas, pagamentos, desconto por autorização, devolução, recibo em PDF | impressão de recibo no app instalado |
-| **S6** | 15/02 – 26/02 | Recados da equipe; WhatsApp `wa.me` e base da API oficial; mensagens configuráveis | **notificações** (paciente chegou, recados) |
-| **S7** | 01/03 – 12/03 | Caixa de entrada do WhatsApp: filas, atribuição, notas, respostas rápidas, janela de 24 h | notificação de mensagem nova e contador no ícone |
+| **S6** | 15/02 – 26/02 | Recados da equipe; WhatsApp `wa.me` e base da API oficial; mensagens configuráveis; módulo de IA (Google AI Studio, §3.3) | **notificações** (paciente chegou, recados) |
+| **S7** | 01/03 – 12/03 | Caixa de entrada do WhatsApp: filas, atribuição, notas, respostas rápidas, janela de 24 h; primeira função com IA (sem dados pessoais) | notificação de mensagem nova e contador no ícone |
 | **S8** | 15/03 – 26/03 | Prontuário I: resumo de saúde, modelos (sistema + clínica), sinais vitais, CID-10 completo, anexos, compartilhado/só do autor, sigilosos, auditoria de leitura | — |
 | **S9** | 29/03 – 09/04 | Prontuário II: assinatura com certificado em nuvem, PDF/A, observações depois de assinado, documentos clínicos; Memed se aprovada | — |
 | **S10** | 12/04 – 23/04 | Assinador A3 (instalador, token, atualização) com os tokens reais dos médicos; API não oficial do WhatsApp (opcional, com termo) | — |
